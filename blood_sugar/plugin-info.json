@@ -1,0 +1,6 @@
+{
+    "display_name": "Blood Sugar",
+    "id": "blood_sugar",
+    "class": "BloodSugar",
+    "repository": "https://github.com/cartagena/InkyPi-BloodSugar"
+}

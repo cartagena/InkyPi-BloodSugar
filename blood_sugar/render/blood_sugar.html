@@ -1,0 +1,17 @@
+{% extends "plugin.html" %}
+
+{% block content %}
+<div class="blood-sugar-container">
+    <div class="reading">
+        <span class="trend">{%- if trend_icon_file -%}
+            {% include "icons/" ~ trend_icon_file %}
+        {%- else -%}
+            ?
+        {%- endif %}</span><span class="value"{% if value_color %} style="color: {{ value_color }};"{% endif %}>{{ value }}</span><span class="delta">({{ delta }})</span>
+    </div>
+    <div class="units-label">{{ units_label }}</div>
+    <div class="secondary">
+        <span class="time">{{ last_reading_time }}</span>
+    </div>
+</div>
+{% endblock %}

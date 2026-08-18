@@ -1,0 +1,43 @@
+
+<div class="form-group">
+    <label for="dexcomServer" class="form-label">Dexcom Server Region:</label>
+    <select id="dexcomServer" name="dexcomServer" class="form-input">
+        <option value="us">United States</option>
+        <option value="ous">Outside United States</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="units" class="form-label">Units:</label>
+    <select id="units" name="units" class="form-input">
+        <option value="mg_dl">mg/dL</option>
+        <option value="mmol_l">mmol/L</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="lowThreshold" class="form-label">Low Threshold (mg/dL):</label>
+    <input type="number" id="lowThreshold" name="lowThreshold" class="form-input" placeholder="70">
+    <label for="lowColor" class="form-label">Low Color:</label>
+    <input type="color" id="lowColor" name="lowColor" class="color-picker" value="#D32F2F">
+</div>
+
+<div class="form-group">
+    <label for="highThreshold" class="form-label">High Threshold (mg/dL):</label>
+    <input type="number" id="highThreshold" name="highThreshold" class="form-input" placeholder="180">
+    <label for="highColor" class="form-label">High Color:</label>
+    <input type="color" id="highColor" name="highColor" class="color-picker" value="#FFC107">
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // pluginSettings is always {} when adding a new instance, so these fallbacks
+        // cover both the create and edit cases without needing separate branches.
+        document.getElementById('dexcomServer').value = pluginSettings.dexcomServer || 'us';
+        document.getElementById('units').value = pluginSettings.units || 'mg_dl';
+        document.getElementById('lowThreshold').value = pluginSettings.lowThreshold || '70';
+        document.getElementById('lowColor').value = pluginSettings.lowColor || '#D32F2F';
+        document.getElementById('highThreshold').value = pluginSettings.highThreshold || '180';
+        document.getElementById('highColor').value = pluginSettings.highColor || '#FFC107';
+    });
+</script>
