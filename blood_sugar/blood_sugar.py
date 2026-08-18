@@ -36,6 +36,15 @@ class BloodSugar(BasePlugin):
             "required": True,
             "service": "Dexcom Share",
             "expected_key": "DEXCOM_USERNAME and DEXCOM_PASSWORD",
+            # "services" is only understood by some InkyPi forks that resolve
+            # per-key presence for the "Requires API Key" badge; upstream InkyPi
+            # ignores it and keeps using "service"/"expected_key" above as-is.
+            # It's an OR check, not AND (both are actually required), since
+            # that's the only per-key presence primitive those forks provide.
+            "services": [
+                {"name": "Username", "env_var": "DEXCOM_USERNAME"},
+                {"name": "Password", "env_var": "DEXCOM_PASSWORD"},
+            ],
         }
         template_params['style_settings'] = True
         return template_params
