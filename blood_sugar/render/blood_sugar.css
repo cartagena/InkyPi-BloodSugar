@@ -49,3 +49,20 @@
     gap: 0.5dvh;
     font-size: min(4.5dvw, 5dvh);
 }
+
+/* Stale state: the last known reading is still shown (it's the only value
+   there is), but demoted so it can't be mistaken for a live one. Opacity is
+   the primary signal because it survives the panel's 6-color quantization
+   intact, unlike a subtle hue change; the .stale-notice line carries the
+   explicit wording for anyone reading the display at a glance. */
+.blood-sugar-container.stale .reading,
+.blood-sugar-container.stale .units-label {
+    opacity: 0.4;
+}
+
+.stale-notice {
+    font-weight: 600;
+    font-size: min(4dvw, 4.5dvh);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
