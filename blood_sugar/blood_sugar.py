@@ -5,6 +5,16 @@ from plugins.base_plugin.base_plugin import BasePlugin
 
 from .dexcom_client import DexcomApiError, DexcomClient, SERVERS, mg_dl_to_mmol_l
 
+# The declarative settings-schema DSL only exists on some InkyPi forks;
+# upstream InkyPi has no `plugins.base_plugin.settings_schema` module at all.
+# Falling back to `schema = None` here (rather than letting the import raise)
+# keeps this file importable on upstream, where settings.html remains the
+# only settings UI — see build_settings_schema() below.
+try:
+    from plugins.base_plugin.settings_schema import field, option, row, schema, section
+except ImportError:  # pragma: no cover - exercised only on upstream InkyPi
+    schema = None
+
 logger = logging.getLogger(__name__)
 
 # Maps a trend name to its pre-authored icon file under render/icons/. Each file draws
@@ -29,6 +39,71 @@ class BloodSugar(BasePlugin):
     def __init__(self, config, **dependencies):
         super().__init__(config, **dependencies)
         self._clients = {}
+
+    def build_settings_schema(self):
+        # settings.html stays as the fallback for forks/upstream without the
+        # schema DSL (see the import guard above); this is the fork-native
+        # equivalent of that same form.
+        if schema is None:
+            return None
+        return schema(
+            section(
+                "Dexcom",
+                row(
+                    field(
+                        "dexcomServer",
+                        "select",
+                        label="Dexcom Server Region",
+                        default="us",
+                        options=[
+                            option("us", "United States"),
+                            option("ous", "Outside United States"),
+                        ],
+                    ),
+                    field(
+                        "units",
+                        "select",
+                        label="Units",
+                        default="mg_dl",
+                        options=[
+                            option("mg_dl", "mg/dL"),
+                            option("mmol_l", "mmol/L"),
+                        ],
+                    ),
+                ),
+            ),
+            section(
+                "Thresholds",
+                row(
+                    field(
+                        "lowThreshold",
+                        "number",
+                        label="Low Threshold (mg/dL)",
+                        default="70",
+                    ),
+                    field(
+                        "lowColor",
+                        "color",
+                        label="Low Color",
+                        default="#D32F2F",
+                    ),
+                ),
+                row(
+                    field(
+                        "highThreshold",
+                        "number",
+                        label="High Threshold (mg/dL)",
+                        default="180",
+                    ),
+                    field(
+                        "highColor",
+                        "color",
+                        label="High Color",
+                        default="#FFC107",
+                    ),
+                ),
+            ),
+        )
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
