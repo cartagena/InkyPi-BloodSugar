@@ -2,6 +2,11 @@
 
 *InkyPi-BloodSugar* is a plugin for [InkyPi](https://github.com/fatihak/InkyPi) that displays your live Dexcom blood glucose reading, trend arrow, delta from the previous reading, and time of the last reading on an e-ink display.
 
+> [!WARNING]
+> **Not a medical device. Do not use this display to make treatment decisions.**
+>
+> This is a hobbyist convenience display built on an unofficial, undocumented API. It is not FDA-cleared, not validated, and has no alarms. It can show wrong or outdated data without any indication of a problem — the network can drop, the sensor can fail, the Share upload can stall, the e-ink panel only refreshes on a schedule, and the API can change or break at any time. Always confirm with your CGM app or a fingerstick meter before dosing insulin, treating a low, or taking any other action.
+
 ## Screenshot
 
 ![InkyPi-BloodSugar screenshot](screenshot.png)
