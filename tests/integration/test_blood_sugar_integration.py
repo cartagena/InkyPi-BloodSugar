@@ -102,6 +102,33 @@ def test_every_trend_icon_renders(
     assert len(image.getcolors(maxcolors=1 << 20)) > 1, "rendered a blank canvas"
 
 
+def test_stale_reading_renders_differently_from_a_fresh_one(
+    plugin: Any, credentialed_config: Any
+) -> None:
+    """The staleness treatment must survive all the way to pixels.
+
+    Its whole purpose is to be visible on the panel, so asserting on
+    template_params would miss a CSS rule that never applied.
+    """
+    from plugins.blood_sugar.blood_sugar import STALE_AFTER_MINUTES
+
+    def render(minutes_ago: float) -> Image.Image:
+        readings = [_reading(55, 4, minutes_ago), _reading(58, 4, minutes_ago + 5)]
+        with patch(
+            "plugins.blood_sugar.dexcom_client.DexcomClient.fetch_latest",
+            return_value=readings,
+        ):
+            return plugin.generate_image({}, credentialed_config)
+
+    fresh = render(2)
+    stale = render(STALE_AFTER_MINUTES + 45)
+
+    assert fresh.tobytes() != stale.tobytes(), (
+        "a stale reading rendered identically to a fresh one — the staleness "
+        "treatment is not reaching the panel"
+    )
+
+
 def test_api_failure_surfaces_as_a_user_facing_runtime_error(
     plugin: Any, credentialed_config: Any
 ) -> None:

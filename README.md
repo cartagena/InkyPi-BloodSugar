@@ -35,6 +35,12 @@ DEXCOM_PASSWORD=your-dexcom-password
 
 Then add the plugin to a playlist and choose your server region (US or Outside US), preferred units (mg/dL or mmol/L), and low/high glucose thresholds in the plugin settings.
 
+## Stale readings
+
+An e-ink panel shows whatever was rendered at the last refresh, so a reading that stopped updating an hour ago looks exactly like a live one. When the most recent reading is more than **15 minutes old** (three missed CGM readings), the plugin dims it, drops the low/high threshold color, and adds a `NO UPDATE · 27 MIN AGO` line under the reading time. The last known value stays on screen — it's still the last thing the sensor reported — but it stops presenting itself as current.
+
+The reading time is rendered in the timezone configured for the display (InkyPi's **Settings → Timezone**), not the Pi's system clock timezone. Those are frequently different on a headless Pi left at UTC.
+
 ## Testing
 
 Two suites, split by what they need. **No test in either one ever contacts Dexcom** — the API is mocked everywhere, so running the suite never touches a real CGM account.
