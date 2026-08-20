@@ -1,9 +1,8 @@
 import logging
-from datetime import datetime
 
 from plugins.base_plugin.base_plugin import BasePlugin
 
-from .dexcom_client import DexcomApiError, DexcomClient, SERVERS, mg_dl_to_mmol_l
+from .dexcom_client import SERVERS, DexcomApiError, DexcomClient, mg_dl_to_mmol_l
 
 # The declarative settings-schema DSL only exists on some InkyPi forks;
 # upstream InkyPi has no `plugins.base_plugin.settings_schema` module at all.
@@ -141,7 +140,9 @@ class BloodSugar(BasePlugin):
             readings = client.fetch_latest(max_count=2)
         except DexcomApiError as e:
             logger.error(f"Dexcom API request failed: {e}")
-            raise RuntimeError("Failed to fetch Dexcom data, please check logs and credentials.")
+            raise RuntimeError(
+                "Failed to fetch Dexcom data, please check logs and credentials."
+            ) from e
 
         if not readings:
             raise RuntimeError("No glucose readings returned from Dexcom.")

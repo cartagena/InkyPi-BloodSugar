@@ -1,33 +1,9 @@
-import os
-import sys
-import types
 import unittest
 
-REPO_ROOT = os.path.join(os.path.dirname(__file__), "..")
-sys.path.insert(0, REPO_ROOT)
-
-# blood_sugar.py does `from plugins.base_plugin.base_plugin import BasePlugin`, which
-# only exists inside a real InkyPi checkout. Stub it out so these tests can run
-# standalone against just this repo, per CLAUDE.md's "no InkyPi needed" philosophy
-# for anything that doesn't actually need Jinja/Chromium rendering.
-if "plugins.base_plugin.base_plugin" not in sys.modules:
-    plugins_pkg = types.ModuleType("plugins")
-    base_plugin_pkg = types.ModuleType("plugins.base_plugin")
-    base_plugin_module = types.ModuleType("plugins.base_plugin.base_plugin")
-
-    class _FakeBasePlugin:
-        def __init__(self, config, **dependencies):
-            self.config = config
-
-    base_plugin_module.BasePlugin = _FakeBasePlugin
-    plugins_pkg.base_plugin = base_plugin_pkg
-    base_plugin_pkg.base_plugin = base_plugin_module
-
-    sys.modules["plugins"] = plugins_pkg
-    sys.modules["plugins.base_plugin"] = base_plugin_pkg
-    sys.modules["plugins.base_plugin.base_plugin"] = base_plugin_module
-
-from blood_sugar.blood_sugar import BloodSugar  # noqa: E402
+# Imported under the plugin's real dotted path so this file runs unchanged
+# both standalone (tests/conftest.py stubs the host BasePlugin) and inside a
+# real InkyPi checkout. See tests/conftest.py.
+from plugins.blood_sugar.blood_sugar import BloodSugar
 
 
 class FormatDeltaTests(unittest.TestCase):

@@ -1,0 +1,10 @@
+# Test-only dependencies for the unit suite (tests/unit), which runs without
+# InkyPi. requests is a real runtime dependency of dexcom_client.py (mocked in
+# tests, but still imported); pillow is imported by blood_sugar.py for a type
+# annotation.
+#
+# The integration suite (tests/integration) installs InkyPi's own requirements
+# instead; see the Testing section of README.md.
+pytest>=8.0,<10
+pillow>=11.0,<13
+requests>=2.32,<3

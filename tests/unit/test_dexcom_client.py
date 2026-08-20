@@ -1,11 +1,10 @@
-import os
-import sys
 import unittest
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "blood_sugar"))
-
-from dexcom_client import (  # noqa: E402
+# Imported under the plugin's real dotted path so this file runs unchanged
+# both standalone (tests/conftest.py stubs the host) and inside a real InkyPi
+# checkout. See tests/conftest.py.
+from plugins.blood_sugar.dexcom_client import (
     DexcomApiError,
     DexcomClient,
     _normalize_trend,
@@ -77,7 +76,7 @@ class DexcomClientTests(unittest.TestCase):
     def setUp(self):
         self.client = DexcomClient("share1.dexcom.com", "user", "pass")
 
-    @patch("dexcom_client.requests.post")
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_login_then_fetch_on_first_call(self, mock_post):
         mock_post.side_effect = [
             _fake_response(json_body="account-id"),
@@ -92,7 +91,7 @@ class DexcomClientTests(unittest.TestCase):
         self.assertEqual(self.client._session_id, "session-id")
         self.assertEqual(mock_post.call_count, 3)
 
-    @patch("dexcom_client.requests.post")
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_reuses_session_on_subsequent_calls(self, mock_post):
         self.client._session_id = "existing-session"
         mock_post.side_effect = [
@@ -104,7 +103,7 @@ class DexcomClientTests(unittest.TestCase):
         self.assertEqual(readings[0].mg_dl, 110)
         mock_post.assert_called_once()
 
-    @patch("dexcom_client.requests.post")
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_retries_once_after_relogin_on_session_expiry(self, mock_post):
         self.client._session_id = "stale-session"
         mock_post.side_effect = [
@@ -120,7 +119,7 @@ class DexcomClientTests(unittest.TestCase):
         self.assertEqual(self.client._session_id, "new-session-id")
         self.assertEqual(mock_post.call_count, 4)
 
-    @patch("dexcom_client.requests.post")
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_max_count_is_never_below_two(self, mock_post):
         self.client._session_id = "existing-session"
         mock_post.side_effect = [_fake_response(json_body=[])]
@@ -130,14 +129,14 @@ class DexcomClientTests(unittest.TestCase):
         _, kwargs = mock_post.call_args
         self.assertEqual(kwargs["params"]["maxCount"], 2)
 
-    @patch("dexcom_client.requests.post")
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_non_200_status_raises(self, mock_post):
         mock_post.return_value = _fake_response(status_code=401, text="unauthorized")
 
         with self.assertRaises(DexcomApiError):
             self.client._login()
 
-    @patch("dexcom_client.requests.post")
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_error_envelope_in_body_raises(self, mock_post):
         mock_post.return_value = _fake_response(json_body={"Code": "SessionNotValid", "Message": "bad session"})
 
