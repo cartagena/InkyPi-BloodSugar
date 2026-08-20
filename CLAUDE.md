@@ -27,19 +27,30 @@ The Dexcom account needs Share enabled with at least one Follower configured —
 
 ## Verifying changes
 
-There's a small stdlib-only `unittest` suite in `tests/` — no pytest, no other dependency, so it runs from a bare checkout of this repo alone:
+Two suites, split by what they require. Both run from this repo — nothing needs copying into an InkyPi checkout.
 
 ```bash
-python -m unittest discover -s tests -v
+pip install -r requirements-dev.txt
+pytest tests/unit                    # anywhere: no InkyPi, no network, no browser
+INKYPI_PATH=../InkyPi pytest         # everything, against a real InkyPi checkout
 ```
 
-`tests/test_dexcom_client.py` covers the pure/deterministic parts of `dexcom_client.py` (trend normalization, WT timestamp parsing, mg/dL→mmol/L conversion) plus `DexcomClient`'s login and retry-once-after-session-expiry flow via a mocked `requests.post` — no network, no real InkyPi needed. `tests/test_blood_sugar.py` covers `BloodSugar._format_delta` and `_compute_value_color`; since `blood_sugar.py` imports InkyPi's `BasePlugin`, this file stubs that import with a minimal fake class so it can still run standalone.
+The test bodies are still `unittest.TestCase` (pytest collects them natively); the runner changed, the style didn't. `tests/conftest.py` registers a stand-in for the one host module `blood_sugar.py` imports unguarded (`BasePlugin`) **only when a real InkyPi isn't importable** — when `INKYPI_PATH` is set it puts `<inkypi>/src` on `sys.path` and stubs nothing, so the identical unit tests run against real host code. CI runs the unit suite both ways deliberately; that's what stops the stub from drifting away from InkyPi's actual behaviour. Note the plugin's *other* host import (the settings-schema DSL) needs no stub: it's already guarded by a try/except so the file stays importable on upstream InkyPi, and standalone that guard simply takes its ImportError branch.
 
-This suite intentionally doesn't (and can't, without a real InkyPi checkout) exercise `generate_image`'s Jinja/Chromium rendering path or the live Dexcom API. For that:
+Two consequences worth keeping in mind:
+
+- **The stub must stay minimal.** Its `render_image` *raises* rather than returning a placeholder image, so a template regression cannot pass the unit suite — covering that is the integration suite's job.
+- **If `INKYPI_PATH` is set but the host still won't import, the conftest raises** rather than falling back to stubs. Silently stubbing there would let CI's integration job report green while having quietly run the unit suite twice.
+
+`tests/integration/` needs `blood_sugar/` symlinked into the checkout (see below) and covers what only real host code can show: loading through the real plugin registry, `plugin-info.json` agreeing with the registered class, all seven trend-arrow SVGs actually rendering (they're `{% include %}`d, so a missing icon only fails at render time), and API/credential failures surfacing as `RuntimeError` so InkyPi shows them in the web UI. **Dexcom is mocked in every one of them** — the suite must never touch a real CGM account.
+
+`tests/unit/test_dexcom_client.py` covers the pure/deterministic parts of `dexcom_client.py` (trend normalization, WT timestamp parsing including its UTC-awareness, mg/dL→mmol/L conversion, malformed-response handling) plus `DexcomClient`'s login and retry-once-after-session-expiry flow via a mocked `requests.post`. `tests/unit/test_blood_sugar.py` covers `_format_delta`, `_compute_value_color`, the client cache's keying, and the staleness/timezone display logic (`_reading_age`, `_format_age`, `_format_reading_time`). Both import the plugin under its real dotted path (`plugins.blood_sugar.*`) rather than as a bare top-level module — that's what lets the same files run unmodified against a real InkyPi checkout.
+
+To set up the integration environment, or to poke at a render by hand:
 
 1. Symlink `blood_sugar/` into a local InkyPi checkout: `ln -s <this-repo>/blood_sugar <inkypi-checkout>/src/plugins/blood_sugar`.
-2. Render directly, bypassing Flask entirely — import InkyPi's `plugins.plugin_registry`, call `load_plugins([{"id": "blood_sugar", "class": "BloodSugar"}])`, get the instance, and call `plugin.render_image(dimensions, "blood_sugar.html", "blood_sugar.css", template_params)` with hand-built `template_params` (or `plugin.generate_image(settings, mock_device_config)` to exercise the real Dexcom API call). Save the returned `PIL.Image` and inspect it.
-3. **Do not start InkyPi's Flask dev server** (`python src/inkypi.py --dev`) to test this plugin — prefer the direct render calls above. Keeps iteration fast and avoids needing a running server (or Chromium reachable from it) for every check.
+2. `INKYPI_PATH=<inkypi-checkout> pytest tests/integration` runs the real render path against a mocked Dexcom API. For one-off inspection, render directly and bypass Flask entirely — import InkyPi's `plugins.plugin_registry`, call `load_plugins([{"id": "blood_sugar", "class": "BloodSugar"}])`, get the instance, and call `plugin.render_image(dimensions, "blood_sugar.html", "blood_sugar.css", template_params)` with hand-built `template_params`. Save the returned `PIL.Image` and inspect it.
+3. **Do not start InkyPi's Flask dev server** (`python src/inkypi.py --dev`) to test this plugin — prefer the integration suite or the direct render call above. Keeps iteration fast and avoids needing a running server (or Chromium reachable from it) for every check.
 
 `py_compile` on `blood_sugar.py`/`dexcom_client.py` catches syntax errors without needing InkyPi at all.
 

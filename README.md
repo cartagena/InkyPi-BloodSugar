@@ -40,6 +40,37 @@ DEXCOM_PASSWORD=your-dexcom-password
 
 Then add the plugin to a playlist and choose your server region (US or Outside US), preferred units (mg/dL or mmol/L), and low/high glucose thresholds in the plugin settings.
 
+## Testing
+
+Two suites, split by what they need. **No test in either one ever contacts Dexcom** — the API is mocked everywhere, so running the suite never touches a real CGM account.
+
+### Unit tests — run anywhere
+
+No InkyPi, no network, no browser. From a bare clone:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/unit
+```
+
+Covers the Dexcom client (trend normalization, `WT` timestamp parsing, mg/dL↔mmol/L conversion, malformed responses, login and the retry-after-session-expiry flow against a mocked `requests.post`) and the plugin's display logic (delta formatting, threshold coloring, staleness, timezone rendering, client caching).
+
+`tests/conftest.py` stands in for the one host module the plugin imports (`BasePlugin`). Its `render_image` deliberately raises rather than returning a fake image, so a template regression can't pass here — that's the integration suite's job.
+
+### Integration tests — need a real InkyPi checkout
+
+Runs against the real `BasePlugin`, the real plugin registry, and the real Jinja + headless-Chromium render pipeline — including all seven trend-arrow SVGs, which are `{% include %}`d and so only fail at render time.
+
+```bash
+git clone https://github.com/jtn0123/InkyPi ../InkyPi
+ln -s "$PWD/blood_sugar" ../InkyPi/src/plugins/blood_sugar
+INKYPI_PATH=../InkyPi pytest tests/integration
+```
+
+Without `INKYPI_PATH` these are skipped, not failed, so a plain `pytest` from a clean clone still exits green having run the unit suite.
+
+CI runs both, plus the *unit* suite a second time with `INKYPI_PATH` set — the same tests unstubbed, so a stub that has drifted from InkyPi's real behavior surfaces as a failure instead of quietly still passing.
+
 ## Development status
 
 Actively maintained.

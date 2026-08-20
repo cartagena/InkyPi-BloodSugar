@@ -2,7 +2,6 @@ import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Optional
 
 import requests
 
@@ -56,7 +55,7 @@ class DexcomApiError(Exception):
 class Reading:
     mg_dl: int
     trend: int
-    timestamp: Optional[datetime]
+    timestamp: datetime | None
 
     @property
     def trend_name(self) -> str:
@@ -125,7 +124,7 @@ class DexcomClient:
             },
         )
 
-    def fetch_latest(self, max_count: int = 2, minutes: int = 1440) -> List[Reading]:
+    def fetch_latest(self, max_count: int = 2, minutes: int = 1440) -> list[Reading]:
         if self._session_id is None:
             self._login()
 
