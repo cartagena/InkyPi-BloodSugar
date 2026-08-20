@@ -2,5 +2,7 @@
     "display_name": "Blood Sugar",
     "id": "blood_sugar",
     "class": "BloodSugar",
+    "api_version": "1.0",
+    "version": "1.0.0",
     "repository": "https://github.com/cartagena/InkyPi-BloodSugar"
 }
