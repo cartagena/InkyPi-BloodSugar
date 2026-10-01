@@ -1,7 +1,8 @@
 import math
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
 
@@ -55,6 +56,10 @@ class DexcomApiError(Exception):
 class Reading:
     mg_dl: int
     trend: int
+    # Timezone-aware, always UTC. Callers convert for display — the raw WT
+    # epoch carries no zone of its own, and rendering it in whatever local
+    # zone the Pi's clock happens to be set to (rather than the timezone
+    # configured for the display) silently shifts every reading time.
     timestamp: datetime | None
 
     @property
@@ -62,27 +67,54 @@ class Reading:
         return TREND_NAMES.get(self.trend, "NONE")
 
 
-def _normalize_trend(raw_trend) -> int:
+def _normalize_trend(raw_trend: object) -> int:
     if raw_trend is None:
         return 0
     key = str(raw_trend).upper().replace(" ", "")
     return _TREND_CODES.get(key, 0)
 
 
-def _parse_reading(raw: dict) -> Reading:
-    match = _WT_EPOCH_RE.search(raw.get("WT", ""))
-    timestamp = datetime.fromtimestamp(int(match.group(1)) / 1000) if match else None
-    return Reading(mg_dl=raw["Value"], trend=_normalize_trend(raw.get("Trend")), timestamp=timestamp)
+def _parse_mg_dl(value: object) -> int:
+    """Coerce an API-supplied glucose value to int.
+
+    Raises DexcomApiError rather than letting a bare TypeError/ValueError out,
+    so an unexpected response shape surfaces as "the Dexcom call failed" like
+    every other API-level problem instead of as an opaque crash.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise DexcomApiError(f"Unexpected glucose value from Dexcom: {value!r}")
+    try:
+        return int(value)
+    except ValueError as e:
+        raise DexcomApiError(f"Unexpected glucose value from Dexcom: {value!r}") from e
+
+
+def _parse_reading(raw: dict[str, object]) -> Reading:
+    wt = raw.get("WT")
+    match = _WT_EPOCH_RE.search(wt) if isinstance(wt, str) else None
+    timestamp = (
+        datetime.fromtimestamp(int(match.group(1)) / 1000, UTC) if match else None
+    )
+    return Reading(
+        mg_dl=_parse_mg_dl(raw.get("Value")),
+        trend=_normalize_trend(raw.get("Trend")),
+        timestamp=timestamp,
+    )
 
 
 class DexcomClient:
-    def __init__(self, server: str, username: str, password: str):
+    def __init__(self, server: str, username: str, password: str) -> None:
         self._base_url = f"https://{server}/ShareWebServices/Services"
         self._username = username
         self._password = password
-        self._session_id = None
+        self._session_id: str | None = None
 
-    def _post(self, path: str, json_body=None, params=None):
+    def _post(
+        self,
+        path: str,
+        json_body: dict[str, object] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> object:
         try:
             response = requests.post(
                 f"{self._base_url}{path}",
@@ -106,7 +138,7 @@ class DexcomClient:
             raise DexcomApiError(f"{path} error {body.get('Code')}: {body.get('Message')}")
         return body
 
-    def _login(self):
+    def _login(self) -> None:
         account_id = self._post(
             "/General/AuthenticatePublisherAccount",
             {
@@ -115,7 +147,7 @@ class DexcomClient:
                 "applicationId": APPLICATION_ID,
             },
         )
-        self._session_id = self._post(
+        session_id = self._post(
             "/General/LoginPublisherAccountById",
             {
                 "accountId": account_id,
@@ -123,18 +155,35 @@ class DexcomClient:
                 "applicationId": APPLICATION_ID,
             },
         )
+        if not isinstance(session_id, str) or not session_id:
+            raise DexcomApiError("Dexcom login did not return a session id.")
+        self._session_id = session_id
 
     def fetch_latest(self, max_count: int = 2, minutes: int = 1440) -> list[Reading]:
         if self._session_id is None:
             self._login()
 
-        params = {"sessionID": self._session_id, "minutes": minutes, "maxCount": max(2, max_count)}
+        params: dict[str, Any] = {
+            "sessionID": self._session_id,
+            "minutes": minutes,
+            "maxCount": max(2, max_count),
+        }
         try:
-            raw_readings = self._post("/Publisher/ReadPublisherLatestGlucoseValues", params=params)
+            raw_readings = self._post(
+                "/Publisher/ReadPublisherLatestGlucoseValues", params=params
+            )
         except DexcomApiError:
+            # Sessions expire server-side with no advance signal, so one
+            # re-login + retry is the normal path, not an exceptional one.
             self._session_id = None
             self._login()
             params["sessionID"] = self._session_id
-            raw_readings = self._post("/Publisher/ReadPublisherLatestGlucoseValues", params=params)
+            raw_readings = self._post(
+                "/Publisher/ReadPublisherLatestGlucoseValues", params=params
+            )
 
-        return [_parse_reading(r) for r in raw_readings]
+        if not isinstance(raw_readings, list):
+            raise DexcomApiError(
+                f"Expected a list of glucose readings, got {type(raw_readings).__name__}."
+            )
+        return [_parse_reading(r) for r in raw_readings if isinstance(r, dict)]

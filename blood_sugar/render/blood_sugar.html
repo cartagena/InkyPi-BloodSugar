@@ -1,7 +1,7 @@
 {% extends "plugin.html" %}
 
 {% block content %}
-<div class="blood-sugar-container">
+<div class="blood-sugar-container{% if is_stale %} stale{% endif %}">
     <div class="reading">
         <span class="trend">{%- if trend_icon_file -%}
             {% include "icons/" ~ trend_icon_file %}
@@ -12,6 +12,12 @@
     <div class="units-label">{{ units_label }}</div>
     <div class="secondary">
         <span class="time">{{ last_reading_time }}</span>
+        {%- if is_stale %}
+        {# The reading is old enough that it no longer describes right now.
+           Say so on the panel — a big number with a trend arrow reads as
+           current whether or not it still is. #}
+        <span class="stale-notice">no update · {{ age_label }}</span>
+        {%- endif %}
     </div>
 </div>
 {% endblock %}

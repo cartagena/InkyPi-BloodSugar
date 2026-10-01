@@ -1,4 +1,5 @@
 import unittest
+from datetime import UTC
 from unittest.mock import Mock, patch
 
 # Imported under the plugin's real dotted path so this file runs unchanged
@@ -50,6 +51,21 @@ class ParseReadingTests(unittest.TestCase):
     def test_missing_trend_defaults_to_none(self):
         reading = _parse_reading({"Value": 100, "WT": "Date(1700000000000)"})
         self.assertEqual(reading.trend_name, "NONE")
+
+    def test_timestamp_is_timezone_aware_utc(self):
+        # Naive local-time timestamps silently shift every reading whenever
+        # the Pi's system zone differs from the display's configured timezone;
+        # the plugin converts from UTC for display instead.
+        reading = _parse_reading({"Value": 100, "Trend": "Flat", "WT": "Date(1700000000000)"})
+        self.assertEqual(reading.timestamp.utcoffset(), UTC.utcoffset(None))
+
+    def test_non_numeric_value_raises_api_error(self):
+        with self.assertRaises(DexcomApiError):
+            _parse_reading({"Value": "n/a", "Trend": "Flat", "WT": "Date(1700000000000)"})
+
+    def test_missing_value_raises_api_error(self):
+        with self.assertRaises(DexcomApiError):
+            _parse_reading({"Trend": "Flat", "WT": "Date(1700000000000)"})
 
 
 class MgDlToMmolLTests(unittest.TestCase):
@@ -132,6 +148,24 @@ class DexcomClientTests(unittest.TestCase):
     @patch("plugins.blood_sugar.dexcom_client.requests.post")
     def test_non_200_status_raises(self, mock_post):
         mock_post.return_value = _fake_response(status_code=401, text="unauthorized")
+
+        with self.assertRaises(DexcomApiError):
+            self.client._login()
+
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
+    def test_non_list_readings_response_raises(self, mock_post):
+        self.client._session_id = "existing-session"
+        mock_post.side_effect = [_fake_response(json_body={"unexpected": "shape"})]
+
+        with self.assertRaises(DexcomApiError):
+            self.client.fetch_latest()
+
+    @patch("plugins.blood_sugar.dexcom_client.requests.post")
+    def test_login_without_session_id_raises(self, mock_post):
+        mock_post.side_effect = [
+            _fake_response(json_body="account-id"),
+            _fake_response(json_body=None),
+        ]
 
         with self.assertRaises(DexcomApiError):
             self.client._login()
